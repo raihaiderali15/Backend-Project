@@ -1,0 +1,12 @@
+{
+  "name": "backend-project",
+  "version": "1.0.0",
+  "description": "A backend Project for learning ",
+  "license": "ISC",
+  "author": "Haider Ali",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}
