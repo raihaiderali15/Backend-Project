@@ -30,6 +30,12 @@
 
 import dotenv from "dotenv"
 import ConnectDB from "./db/index.js"
-
+import app from "./app.js"
 
 ConnectDB()
+.then(process.env.PORT|| 4000,()=>{
+    app.listen(console.log(`Sever is running on the port ${process.env.PORT}`))
+})
+.catch((error)=>{
+    console.log(error)
+})
