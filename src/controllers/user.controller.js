@@ -4,6 +4,7 @@ import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import fs from "fs";
+import jwt from "jsonwebtoken";
 const generateAccessAndRefreshToken = async (userId) => {
   try {
     const user = await User.findById(userId);
@@ -33,7 +34,7 @@ const registerUser = asyncHandler(async (req, res) => {
     }
   }
 
-   //checking for images of avatar and coverImage
+  //checking for images of avatar and coverImage
 
   if (!localPathOfAvatar) {
     throw new ApiError(400, "Avatar is required");
@@ -44,11 +45,10 @@ const registerUser = asyncHandler(async (req, res) => {
   const exsistingUser = await User.findOne({ $or: [{ username }, { email }] });
   if (exsistingUser) {
     fs.unlinkSync(localPathOfAvatar);
-   if(localPathOfCoverImage)fs.unlinkSync(localPathOfCoverImage);
+    if (localPathOfCoverImage) fs.unlinkSync(localPathOfCoverImage);
 
     throw new ApiError(409, "User with this name or email already exist");
   }
- 
 
   //uploading it to cloudinary
   const avatar = await uploadOnCloudinary(localPathOfAvatar);
@@ -126,23 +126,58 @@ const loginUser = asyncHandler(async (req, res) => {
 });
 
 const logoutUser = asyncHandler(async (req, res) => {
-
-    //deleting refresh token from db
-    await User.findByIdAndUpdate(req.user._id,{
-        $unset:{refreshToken:1}
-    }
-)
-const cookiesOptions={
-    httpOnly:true,
-    secure:true
-}
-return res.status(200)
-.clearCookie("refreshToken",cookiesOptions)
-.clearCookie("accessToken",cookiesOptions)
-.json(
-    new ApiResponse(200,{},"User logout Successfully")
-)
-
+  //deleting refresh token from db
+  await User.findByIdAndUpdate(req.user._id, {
+    $unset: { refreshToken: 1 },
+  });
+  const cookiesOptions = {
+    httpOnly: true,
+    secure: true,
+  };
+  return res
+    .status(200)
+    .clearCookie("refreshToken", cookiesOptions)
+    .clearCookie("accessToken", cookiesOptions)
+    .json(new ApiResponse(200, {}, "User logout Successfully"));
 });
 
-export { registerUser, loginUser, logoutUser };
+const refreshAccessToken = asyncHandler(async (req, res) => {
+  try {
+    const incomingToken =
+      req.cookies?.refreshToken ||
+      req.header("Authorization")?.replace("Bearer ", "");
+    if (!incomingToken) {
+      throw new ApiError(401, "Unauthorized User");
+    }
+    const decoded = jwt.verify(incomingToken, process.env.REFRESH_TOKEN_SECRET);
+    const user = await User.findById(decoded._id);
+    if (!user) {
+      throw new ApiError(401, "Invalid Refresh Token");
+    }
+    if (user.refreshToken !== incomingToken) {
+      throw new ApiError(401, "this refresh token no longer exsist");
+    }
+    const { refreshToken, accessToken } = await generateAccessAndRefreshToken(
+      user._id
+    );
+    const cookiesOptions = {
+      httpOnly: true,
+      secure: true,
+    };
+    return res
+      .status(200)
+      .cookie("refreshToken", refreshToken, cookiesOptions)
+      .cookie("accessToken", accessToken, cookiesOptions)
+      .json(
+        new ApiResponse(
+          200,
+          { refreshToken, accessToken },
+          "Token refresh successfully"
+        )
+      );
+  } catch (error) {
+    throw new ApiError(401, error.message || "Something went wrong");
+  }
+});
+
+export { registerUser, loginUser, logoutUser, refreshAccessToken };
