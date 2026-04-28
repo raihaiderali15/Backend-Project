@@ -180,21 +180,98 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
   }
 });
 
+const uptadePassword = asyncHandler(async (req, res) => {
+  const { oldPassword, newPassword, confirmPassword } = req.body;
+  if (newPassword !== confirmPassword) {
+    throw new ApiError(
+      401,
+      "New password is not matching with confirm Password"
+    );
+  }
+  const user = await User.findById(req.user._id);
+  const validPassword = await user.isPasswordCorrect(oldPassword);
+  if (!validPassword) {
+    throw new ApiError(401, "Invalid Password");
+  }
+  user.password = newPassword;
+  await user.save();
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Password Changed Successfully"));
+});
+const getCurrentUser = asyncHandler(async (req, res) => {
+  return res
+    .status(200)
+    .json(new ApiResponse(200, req.user, "Get user information successfully"));
+});
+const uptadeAccountDetail = asyncHandler(async (req, res) => {
+  const { username, fullname, email } = req.body;
+  if (!username && !fullname && !email) {
+    throw new ApiError(401, "Username or Email or Fullname is required");
+  }
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    {
+      email,
+      fullname,
+      username,
+    },
+    {
+      new: true,
+    }
+  ).select("-password");
 
-const uptadePassword=asyncHandler(async(req,res)=>{
-    const {oldPassword,newPassword,confirmPassword}=req.body;
-if(newPassword!==confirmPassword){
-  throw new ApiError(401,"New password is not matching with confirm Password")
-}     
-    const user= await User.findById(req.user._id)
-   const validPassword=await user.isPasswordCorrect(oldPassword)
-   if(!validPassword){
-    throw new ApiError(401,"Invalid Password")
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, "Information Uptaded Succssfully"));
+});
+const uptadeAvatar=asyncHandler(async(req,res)=>{
+
+        const localPathOfAvatar=req.file?.path
+      
+        if(!localPathOfAvatar){
+          throw new ApiError(401,"Please upload the avatar photo")
+        }
+   const avatar= await  uploadOnCloudinary(localPathOfAvatar);
+   if(!avatar){
+    throw new ApiError(500,"Problem occur while uploading to cloundinary")
    }
-  user.password=newPassword
-   await user.save()
-return res.status(200)
-.json(new ApiResponse(200,{},"Password Changed Successfully"))
+   const user= await User.findByIdAndUpdate(req.user._id,{
+    avatar:avatar.url
+   },{new:true}).select("-password")
+   res.status(200)
+   .json(
+    new ApiResponse(200,user,"Avatar Uptaded Successfully")
+   )
 })
 
-export { registerUser, loginUser, logoutUser, refreshAccessToken,uptadePassword };
+const uptadeCoverImage=asyncHandler(async(req,res)=>{
+        console.log(req.file)
+        const localPathOfCoverImage=req.file?.path
+        console.log(localPathOfCoverImage)
+        if(!localPathOfCoverImage){
+          throw new ApiError(401,"Please upload the Cover photo")
+        }
+   const coverImage= await  uploadOnCloudinary(localPathOfCoverImage);
+   if(!coverImage){
+    throw new ApiError(500,"Problem occur while uploading to cloundinary")
+   }
+  const user= await User.findByIdAndUpdate(req.user._id,{
+    coverimage:coverImage.url
+   },{new:true}).select("-password")
+   res.status(200)
+   .json(
+    new ApiResponse(200,user,"CoverImage Uptaded Successfully")
+   )
+})
+export {
+  registerUser,
+  loginUser,
+  logoutUser,
+  refreshAccessToken,
+  uptadePassword,
+  getCurrentUser,
+  uptadeAccountDetail,
+  uptadeAvatar,
+  uptadeCoverImage
+};
