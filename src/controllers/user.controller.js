@@ -194,7 +194,7 @@ const uptadePassword = asyncHandler(async (req, res) => {
     throw new ApiError(401, "Invalid Password");
   }
   user.password = newPassword;
-  await user.save();
+  await user.save({validateBeforeSave:true});
   return res
     .status(200)
     .json(new ApiResponse(200, {}, "Password Changed Successfully"));
@@ -209,16 +209,16 @@ const uptadeAccountDetail = asyncHandler(async (req, res) => {
   if (!username && !fullname && !email) {
     throw new ApiError(401, "Username or Email or Fullname is required");
   }
+  const fieldsToUptade={}
+  if(username) fieldsToUptade.username=username;
+  if(fullname) fieldsToUptade.fullname=fullname;
+  if(email) fieldsToUptade.email=email;
+  console.log(fieldsToUptade)
   const user = await User.findByIdAndUpdate(
     req.user._id,
     {
-      email,
-      fullname,
-      username,
+     $set:fieldsToUptade
     },
-    {
-      new: true,
-    }
   ).select("-password");
 
   return res
@@ -230,14 +230,14 @@ const uptadeAvatar=asyncHandler(async(req,res)=>{
         const localPathOfAvatar=req.file?.path
       
         if(!localPathOfAvatar){
-          throw new ApiError(401,"Please upload the avatar photo")
+          throw new ApiError(400,"Please upload the avatar photo")
         }
    const avatar= await  uploadOnCloudinary(localPathOfAvatar);
    if(!avatar){
     throw new ApiError(500,"Problem occur while uploading to cloundinary")
    }
    const user= await User.findByIdAndUpdate(req.user._id,{
-    avatar:avatar.url
+   $set:{ avatar:avatar.url}
    },{new:true}).select("-password")
    res.status(200)
    .json(
