@@ -5,6 +5,8 @@ import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import fs from "fs";
 import jwt from "jsonwebtoken";
+import { channel } from "diagnostics_channel";
+import { Subscription } from "../models/subscription.model.js";
 const generateAccessAndRefreshToken = async (userId) => {
   try {
     const user = await User.findById(userId);
@@ -179,7 +181,6 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     throw new ApiError(401, error.message || "Something went wrong");
   }
 });
-
 const uptadePassword = asyncHandler(async (req, res) => {
   const { oldPassword, newPassword, confirmPassword } = req.body;
   if (newPassword !== confirmPassword) {
@@ -264,6 +265,103 @@ const uptadeCoverImage=asyncHandler(async(req,res)=>{
     new ApiResponse(200,user,"CoverImage Uptaded Successfully")
    )
 })
+
+const getUserChannelProfile=asyncHandler(async(req,res)=>
+  {
+    const {username}=req.params
+    console.log(req.params)
+    console.log(username)
+    if(!username){
+      throw new ApiError(400,"User is missing")
+    }
+   const channel= await User.aggregate([
+      {
+        $match:{username:username?.toLowerCase()}
+      },
+      {
+        $lookup:{
+          from:"subscriptions",
+          localField:"_id",
+          foreignField:"channel",
+          as:"subscriber"
+        },
+      },
+        {
+          $lookup:{
+            from:"subscriptions",
+            localField:"_id",
+            foreignField:"subscriber",
+            as:"subscribed"
+          }
+        },
+        {
+          $addFields:{
+            subscriberCount:{
+            $size:"$subscriber"
+            },
+            channelSubscribedtoCount:{
+              $size:"$subscribed"
+            }
+            
+          }
+        },
+        {
+          $project:{
+            email:1,
+            username:1,
+            fullname:1,
+            subscriberCount:1,
+            channelSubscribedtoCount:1,
+            avatar:1,
+            coverImage:1
+          }
+        }
+      
+    ])
+    if(!channel.length){
+      throw new ApiError(400,"Chennel not found")
+    }
+   return res.status(200).json(
+    new ApiResponse(200, channel[0], "User channel fetched successfully")
+)
+
+    }
+)
+
+const subscribeToChannel=asyncHandler(async(req,res)=>{
+  
+  const subscriber=req.user
+ const {channelId}=req.params
+if(!channelId){
+  throw new ApiError(400,"Channel does not exsist")
+}
+if(channelId.toLowerCase() === subscriber.username.toLowerCase()){
+  throw new ApiError(400,"You cannot subscriber to yourself")
+}
+ const channel= await User.findOne({username:channelId})
+ if(!channel){
+  throw new ApiError(401,"Channel not found")
+ }
+
+  
+const exsist= await Subscription.findOneAndDelete({subscriber:subscriber._id,channel:channel._id})
+if(!exsist){
+  
+const data= await Subscription.create({
+    subscriber:subscriber._id,
+    channel:channel._id
+ })
+
+ return res.status(200)
+ .json(
+  new ApiResponse(200,data,"test")
+ )
+}
+return res.status(200).json(new ApiResponse(200,{},"User unsubscriber successfully"))
+
+  
+
+})
 export {
   registerUser,
   loginUser,
@@ -273,5 +371,7 @@ export {
   getCurrentUser,
   uptadeAccountDetail,
   uptadeAvatar,
-  uptadeCoverImage
+  uptadeCoverImage,
+  getUserChannelProfile,
+  subscribeToChannel
 };

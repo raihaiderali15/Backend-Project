@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { upload } from "../middlewares/multer.middleware.js";
-import { loginUser , registerUser,logoutUser, refreshAccessToken,uptadePassword, uptadeAccountDetail, uptadeAvatar, uptadeCoverImage} from "../controllers/user.controller.js";
+import { loginUser , registerUser,logoutUser, refreshAccessToken,uptadePassword, uptadeAccountDetail, uptadeAvatar, uptadeCoverImage, getUserChannelProfile, subscribeToChannel} from "../controllers/user.controller.js";
 import { verifyJwt } from "../middlewares/auth.middleware.js";
 const router = Router();
 
@@ -26,4 +26,7 @@ router.route("/uptadepassword").post(verifyJwt,uptadePassword)
 router.route("/uptadeaccount").post(verifyJwt,uptadeAccountDetail)
 router.route("/uptadeavatar").post(upload.single("avatar"),verifyJwt,uptadeAvatar)
 router.route("/uptadecoverimage").post(upload.single("coverimage"),verifyJwt,uptadeCoverImage)
+router.route("/:username").get(verifyJwt,getUserChannelProfile)
+
+router.route("/subscribe/:channelId").post(verifyJwt,subscribeToChannel)
 export default router;
