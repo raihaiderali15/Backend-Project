@@ -214,7 +214,6 @@ const uptadeAccountDetail = asyncHandler(async (req, res) => {
   if(username) fieldsToUptade.username=username;
   if(fullname) fieldsToUptade.fullname=fullname;
   if(email) fieldsToUptade.email=email;
-  console.log(fieldsToUptade)
   const user = await User.findByIdAndUpdate(
     req.user._id,
     {
