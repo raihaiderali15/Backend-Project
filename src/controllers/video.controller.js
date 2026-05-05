@@ -107,4 +107,32 @@ const deletVido = asyncHandler(async (req, res) => {
     .status(200)
     .json(new ApiResponse(200,{}, "Video deleted succesfully"));
 });
-export { publishVideo, uptadeVideo, getVideoById ,deletVido};
+const togglePublishStatus=asyncHandler(async(req,res)=>
+  {
+    const {videoId}=req.params
+    const video=await Video.findById(videoId);
+if(!video){
+    throw new ApiError(404,"Video is not available")
+  }
+  const uptadeVideo  =  await Video.findByIdAndUpdate(videoId,{$set:{
+    isPublished:!video.isPublished
+  }},{returnDocument:"after"})
+  
+      
+      return res.status(200)
+      .json(
+        new ApiResponse(200,uptadeVideo,`video is ${uptadeVideo.isPublished?"Published":"unPublished"} Successfully`)
+      )
+      
+  }
+)
+const getAllVideos=asyncHandler(async(req,res)=>
+  {
+  const { page = 1., limit = 10, query, sortBy, sortType, userId } = req.query
+  
+   
+  
+    
+  }
+)
+export { publishVideo, uptadeVideo, getVideoById ,deletVido,togglePublishStatus,getAllVideos};
