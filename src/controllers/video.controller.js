@@ -1,10 +1,14 @@
 import asyncHandler from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-import { removeFromCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js";
+import {
+  removeFromCloudinary,
+  uploadOnCloudinary,
+} from "../utils/cloudinary.js";
 import { User } from "../models/user.model.js";
 import { Video } from "../models/video.model.js";
 import fs from "fs";
+import mongoose from "mongoose";
 const diskcleanUp = (...path) => {
   path.forEach((element) => {
     if (element && fs.existsSync(element)) {
@@ -43,9 +47,8 @@ const publishVideo = asyncHandler(async (req, res) => {
     thumbnail: thumbnailUrl.url,
     owner: logdinUser._id,
     duration: videoUrl.duration,
-   videoPublicId:videoUrl.public_id,
-   thumbnailPublicId:thumbnailUrl.public_id
-
+    videoPublicId: videoUrl.public_id,
+    thumbnailPublicId: thumbnailUrl.public_id,
   });
   return res
     .status(200)
@@ -98,41 +101,131 @@ const deletVido = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const video = await Video.findOneAndDelete({ _id: id, owner: req.user._id });
   if (!video) {
-      throw new ApiError(400, "Video is not found or already deleted");
-    }
-    console.log(video.videoPublicId,video.thumbnailPublicId)
-    await removeFromCloudinary(video.videoPublicId,"video")
-    await removeFromCloudinary(video.thumbnailPublicId,"image")
+    throw new ApiError(400, "Video is not found or already deleted");
+  }
+  console.log(video.videoPublicId, video.thumbnailPublicId);
+  await removeFromCloudinary(video.videoPublicId, "video");
+  await removeFromCloudinary(video.thumbnailPublicId, "image");
   return res
     .status(200)
-    .json(new ApiResponse(200,{}, "Video deleted succesfully"));
+    .json(new ApiResponse(200, {}, "Video deleted succesfully"));
 });
-const togglePublishStatus=asyncHandler(async(req,res)=>
-  {
-    const {videoId}=req.params
-    const video=await Video.findById(videoId);
-if(!video){
-    throw new ApiError(404,"Video is not available")
+const togglePublishStatus = asyncHandler(async (req, res) => {
+  const { videoId } = req.params;
+  const video = await Video.findById(videoId);
+  if (!video) {
+    throw new ApiError(404, "Video is not available");
   }
-  const uptadeVideo  =  await Video.findByIdAndUpdate(videoId,{$set:{
-    isPublished:!video.isPublished
-  }},{returnDocument:"after"})
-  
-      
-      return res.status(200)
-      .json(
-        new ApiResponse(200,uptadeVideo,`video is ${uptadeVideo.isPublished?"Published":"unPublished"} Successfully`)
+  const uptadeVideo = await Video.findByIdAndUpdate(
+    videoId,
+    {
+      $set: {
+        isPublished: !video.isPublished,
+      },
+    },
+    { returnDocument: "after" }
+  );
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        uptadeVideo,
+        `video is ${uptadeVideo.isPublished ? "Published" : "unPublished"} Successfully`
       )
-      
+    );
+});
+const getAllVideos = asyncHandler(async (req, res) => {
+  const { query, sortBy, sortType, userId } = req.query;
+const pageNumber=parseInt(req.query.page)||1
+const limit = parseInt(req.query.limit) || 10
+const skipNumber=(pageNumber-1)*limit;
+  const matchStage = { isPublished: true };
+
+  if (userId) {
+    if(!mongoose.Types.ObjectId.isValid(userId))
+    {
+      throw new ApiError(400,"Invalid User Id")
+    }
+    matchStage.owner = new mongoose.Types.ObjectId(userId);
   }
-)
-const getAllVideos=asyncHandler(async(req,res)=>
-  {
-  const { page = 1., limit = 10, query, sortBy, sortType, userId } = req.query
-  
-   
-  
+  if (query) {
+    matchStage.$or = [
+      { title: { $regex: query, $options: "i" } },
+      { description: { $regex: query, $options: "i" } },
+    ];
+  }
+  const sort = {};
+
+  const allowedFields = ["views", "duration", "createdAt"];
+  if (allowedFields.includes(sortBy)) {
+    sort[sortBy] = sortType === "asc" ? 1 : -1;
+  }else{
+    sort.createdAt=-1
+  }
+
+  console.log(sortBy);
+  const video = await Video.aggregate([
+    { $match: matchStage },
+    {
+      $lookup: {
+        from: "users",
+        localField: "owner",
+        foreignField: "_id",
+        as: "ownerDetails",
+        pipeline: [
+          {
+            $project: {
+              username: 1,
+              fullname: 1,
+              email: 1,
+              avatar: 1,
+              coverimage: 1,
+            },
+          },
+        ],
+      },
+    },
+
+    {
+      $addFields: {
+        ownerDetails:{$first: "$ownerDetails" },
+      },
+    },
+    { $sort: sort },
+    {
+      $skip:skipNumber
+    },
+    {
+      $limit:limit
+    }
     
+  ]);
+  const total= await Video.countDocuments(matchStage)
+  const totalPages=Math.ceil(total/limit);
+  if(!video.length){
+    throw new ApiError(404,"No result found")
   }
-)
-export { publishVideo, uptadeVideo, getVideoById ,deletVido,togglePublishStatus,getAllVideos};
+  
+return res.status(200)
+.json(
+  new ApiResponse(200,{
+    videos:video,
+    total,
+    totalPages,
+    currentPage:pageNumber,
+    hasNextPage:pageNumber<totalPages,
+    hasPrevPage:pageNumber>1
+  },"All videos fetch successfully")
+)  
+
+});
+export {
+  publishVideo,
+  uptadeVideo,
+  getVideoById,
+  deletVido,
+  togglePublishStatus,
+  getAllVideos,
+};
