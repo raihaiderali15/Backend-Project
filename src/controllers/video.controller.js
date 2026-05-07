@@ -138,42 +138,54 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
 });
 const getAllVideos = asyncHandler(async (req, res) => {
   const { query, sortBy, sortType, userId } = req.query;
-const pageNumber=parseInt(req.query.page)||1
-const limit = parseInt(req.query.limit) || 10
-const skipNumber=(pageNumber-1)*limit;
-  const matchStage = { isPublished: true };
 
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+
+  // Match Stage
+  const matchStage = {
+    isPublished: true,
+  };
+
+  // Filter by owner
   if (userId) {
-    if(!mongoose.Types.ObjectId.isValid(userId))
-    {
-      throw new ApiError(400,"Invalid User Id")
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      throw new ApiError(400, "Invalid User Id");
     }
+
     matchStage.owner = new mongoose.Types.ObjectId(userId);
   }
+
+  // Search query
   if (query) {
     matchStage.$or = [
       { title: { $regex: query, $options: "i" } },
       { description: { $regex: query, $options: "i" } },
     ];
   }
-  const sort = {};
 
-  const allowedFields = ["views", "duration", "createdAt"];
-  if (allowedFields.includes(sortBy)) {
-    sort[sortBy] = sortType === "asc" ? 1 : -1;
-  }else{
-    sort.createdAt=-1
+  // Sorting
+  const allowedSortFields = ["views", "duration", "createdAt"];
+
+  const sortStage = {};
+
+  if (allowedSortFields.includes(sortBy)) {
+    sortStage[sortBy] = sortType === "asc" ? 1 : -1;
+  } else {
+    sortStage.createdAt = -1;
   }
 
-  console.log(sortBy);
-  const video = await Video.aggregate([
+  // Aggregate Pipeline
+  const aggregate = Video.aggregate([
     { $match: matchStage },
+
     {
       $lookup: {
         from: "users",
         localField: "owner",
         foreignField: "_id",
         as: "ownerDetails",
+
         pipeline: [
           {
             $project: {
@@ -190,36 +202,44 @@ const skipNumber=(pageNumber-1)*limit;
 
     {
       $addFields: {
-        ownerDetails:{$first: "$ownerDetails" },
+        ownerDetails: {
+          $first: "$ownerDetails",
+        },
       },
     },
-    { $sort: sort },
-    {
-      $skip:skipNumber
-    },
-    {
-      $limit:limit
-    }
-    
-  ]);
-  const total= await Video.countDocuments(matchStage)
-  const totalPages=Math.ceil(total/limit);
-  if(!video.length){
-    throw new ApiError(404,"No result found")
-  }
-  
-return res.status(200)
-.json(
-  new ApiResponse(200,{
-    videos:video,
-    total,
-    totalPages,
-    currentPage:pageNumber,
-    hasNextPage:pageNumber<totalPages,
-    hasPrevPage:pageNumber>1
-  },"All videos fetch successfully")
-)  
 
+    { $sort: sortStage },
+  ]);
+
+  // Pagination Options
+  const options = {
+    page,
+    limit,
+  };
+
+  // Paginated Result
+  const result = await Video.aggregatePaginate(aggregate, options);
+
+  // No Videos Found
+  if (!result.docs.length) {
+    throw new ApiError(404, "No videos found");
+  }
+
+  // Response
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        videos: result.docs,
+        total: result.totalDocs,
+        totalPages: result.totalPages,
+        currentPage: result.page,
+        hasNextPage: result.hasNextPage,
+        hasPrevPage: result.hasPrevPage,
+      },
+      "Videos fetched successfully"
+    )
+  );
 });
 export {
   publishVideo,
