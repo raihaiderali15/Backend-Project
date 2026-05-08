@@ -6,6 +6,7 @@ router.use(verifyJwt);
 router.route("/tweet").post(createTweet)
 router.route("/uptade/:tweetId").patch(updateTweet)
 router.route("/delete/:tweetId").delete(deleteTweet)
+router.route("/getTweets/:userId").get(getUserTweets)
 
 
 export default router

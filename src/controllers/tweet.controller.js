@@ -51,7 +51,7 @@ const updateTweet = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, updatedTweet, "Tweet updated successfully"));
 });
 const deleteTweet = asyncHandler(async (req, res) => {
-   let { tweetId } = req.params;
+  let { tweetId } = req.params;
 
   if (!tweetId) {
     throw new ApiError(400, "Tweet ID is required");
@@ -59,9 +59,10 @@ const deleteTweet = asyncHandler(async (req, res) => {
 
   tweetId = new mongoose.Types.ObjectId(tweetId);
 
-  const deletedTweet = await Tweet.findOneAndDelete(
-    { _id: tweetId, owner: req.user._id },
-  );
+  const deletedTweet = await Tweet.findOneAndDelete({
+    _id: tweetId,
+    owner: req.user._id,
+  });
 
   if (!deletedTweet) {
     throw new ApiError(
@@ -75,8 +76,76 @@ const deleteTweet = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, {}, "Tweet deleted successfully"));
 });
 
-
-
-const getUserTweets = asyncHandler(async (req, res) => {});
+const getUserTweets = asyncHandler(async (req, res) => {
+  let { userId } = req.params;
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  if (!userId) {
+    throw new ApiError(400, "User Id is required");
+  } else {
+    userId = new mongoose.Types.ObjectId(userId);
+  }
+  const matchStage = {
+    owner: userId,
+  };
+  const tweetObject = Tweet.aggregate([
+    {
+      $match: matchStage,
+    },
+    {
+      $lookup: {
+        from: "users",
+        localField: "owner",
+        foreignField: "_id",
+        as: "ownerDetails",
+        pipeline: [
+          {
+            $project: {
+              username: 1,
+              fullname: 1,
+              avatar: 1,
+              coverimage: 1,
+              email: 1,
+              createdAt: 1,
+              updatedAt: 1,
+            },
+          },
+        ],
+      },
+    },
+    {
+      $addFields: {
+        ownerDetails: {
+          $first: "$ownerDetails",
+        },
+      },
+    },
+    {
+      $sort: {
+        createdAt: -1,
+      },
+    },
+  ]);
+  const options = {
+    page,
+    limit,
+  };
+  const tweets = await Tweet.aggregatePaginate(tweetObject, options);
+  console.log(tweets);
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        tweets: tweets.docs,
+        total: tweets.totalDocs,
+        totalPages: tweets.totalPages,
+        currentPage: tweets.page,
+        hasNextPage: tweets.hasNextPage,
+        hasPrevPage: tweets.hasPrevPage,
+      },
+      "All tweets fetched successfully"
+    )
+  );
+});
 
 export { createTweet, updateTweet, deleteTweet, getUserTweets };
