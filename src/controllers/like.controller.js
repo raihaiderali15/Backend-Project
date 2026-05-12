@@ -143,16 +143,42 @@ const getLikedVideosCount = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Valid video ID is required");
     }
 
-    const count = await Like.countDocuments({
-        video: new mongoose.Types.ObjectId(videoId),
-    });
-    console.log(count)
+    const count = await Like.countDocuments({ video: videoId });
+
     return res
         .status(200)
         .json(new ApiResponse(200, { count }, "Video like count fetched successfully"));
 });
+const getLikedTweetCount = asyncHandler(async (req, res) => {
+    const { tweetId } = req.params;
+
+    if (!tweetId || !mongoose.Types.ObjectId.isValid(tweetId)) {
+        throw new ApiError(400, "Valid Tweet ID is required");
+    }
+
+    const count = await Like.countDocuments({ tweet: tweetId });
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, { count }, "Tweet like count fetched successfully"));
+});
+
+const getLikedCommentsCount = asyncHandler(async (req, res) => {
+    const {commentId} = req.params;
+
+    if (!commentId || !mongoose.Types.ObjectId.isValid(commentId)) {
+        throw new ApiError(400, "Valid Comment ID is required");
+    }
+
+    const count = await Like.countDocuments({ comment: commentId });
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, { count }, "Comment like count fetched successfully"));
+});
+
 const getLikedVideos = asyncHandler(async (req, res) => {
 
 });
 
-export { toggleCommentLike, toggleTweetLike, toggleVideoLike, getLikedVideos ,getLikedVideosCount};
+export { toggleCommentLike, toggleTweetLike, toggleVideoLike, getLikedVideos ,getLikedVideosCount,getLikedCommentsCount,getLikedTweetCount};

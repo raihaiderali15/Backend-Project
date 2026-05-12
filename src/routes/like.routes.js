@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { verifyJwt } from "../middlewares/auth.middleware.js";
-import { getLikedVideosCount, toggleCommentLike, toggleTweetLike, toggleVideoLike } from "../controllers/like.controller.js";
+import { getLikedVideosCount, toggleCommentLike, toggleTweetLike, toggleVideoLike,getLikedTweetCount,getLikedCommentsCount } from "../controllers/like.controller.js";
 
 const router=Router();
 
@@ -10,6 +10,8 @@ router.route("/commentLike/:commentId").post(toggleCommentLike)
 router.route("/tweetLike/:tweetId").post(toggleTweetLike)
 
 
-router.route("/likeCount/:videoId").post(getLikedVideosCount)
+router.route("/likeVideoCount/:videoId").post(getLikedVideosCount)
+router.route("/likeTweetCount/:tweetId").post(getLikedTweetCount)
+router.route("/likeCommmentCount/:commentId").post(getLikedCommentsCount)
 
 export default router
